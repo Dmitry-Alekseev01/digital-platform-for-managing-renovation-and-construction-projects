@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  lint-and-migrate:
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: Backend
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: secretpassword
+          POSTGRES_DB: construction_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Prepare env
+        run: |
+          cp .env.example .env
+          sed -i 's/POSTGRES_PASSWORD=CHANGE_ME/POSTGRES_PASSWORD=secretpassword/' .env
+          sed -i 's/SECRET_KEY=CHANGE_ME_GENERATE_WITH_python_secrets_token_hex_32/SECRET_KEY=ci_secret_key_for_tests_only/' .env
+
+      - name: Check migrations apply cleanly
+        run: alembic upgrade head
+
+      - name: Lint
+        run: |
+          flake8 app migrations --exclude=migrations/versions
+          black --check app migrations
+          isort --check-only app migrations
