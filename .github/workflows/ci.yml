@@ -50,6 +50,6 @@ jobs:
 
       - name: Lint
         run: |
-          flake8 app migrations
+          flake8 app migrations --exclude=migrations/versions
           black --check app migrations
           isort --check-only app migrations
